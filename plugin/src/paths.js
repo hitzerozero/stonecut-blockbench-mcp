@@ -1,4 +1,5 @@
 const PREFIX = /^(output|assets):(.*)$/;
+const WINDOWS_DEVICE = /^(con|prn|aux|nul|com\d|lpt\d)(\..*)?$/i;
 
 function defaultOutput() { return PathM.join(SystemInfo.home_directory, OUTPUT_FOLDER_NAME); }
 function absoluteSetting(key) {
@@ -57,6 +58,7 @@ function checkPath(p, exts) {
   if (full.slice(PathM.parse(full).root.length).includes(':')) bad('Path may not contain ":" after the drive');
   const root = Object.values(r).find((dir) => inside(dir, full));
   if (!root) bad(`Path not allowed: ${full}. Allowed folders: ${Object.values(r).join(', ')}`);
+  if (PathM.relative(root, full).split(/[\\/]/).some((seg) => WINDOWS_DEVICE.test(seg))) bad('Path may not use a Windows device name (CON, PRN, AUX, NUL, COM1, LPT1...): ' + full);
   const f = scopedFs(root);
   if (isBridgeFile(full, f)) bad('This file belongs to the bridge itself and cannot be read or written: ' + full);
   checkNoLinks(root, full, f);

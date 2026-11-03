@@ -120,7 +120,8 @@ false); `test/annotations.test.ts` holds the expected values.
 ## Releasing
 
 1. `npm run build` and commit, so `plugin/stonecut_bridge.js` and its `.sha256` match the source.
-2. Tag `v<version>` (the same as `package.json` and `src/version.ts`) and create the GitHub release.
+2. Bump the version in all three places, `package.json`, `src/version.ts` and `VERSION` in
+   `plugin/src/core.js` (a test checks they match), then tag `v<version>` and create the GitHub release.
 3. Attach `plugin/stonecut_bridge.js` to the release and paste the SHA-256 from
    `plugin/stonecut_bridge.js.sha256` into the release notes. The README, the setup prompt and
    `install` point at `releases/download/v<version>/stonecut_bridge.js`.

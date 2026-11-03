@@ -9,6 +9,7 @@ import { BLOCKBENCH_FS_SYNC, blockbenchScopedFs, loadPlugin, type Sandbox } from
 import { tempDir } from '../helpers/temp.js';
 
 const NAMES = [
+  'withoutTextureLookup', 'loadGeo',
   'javaTextureLoader', 'checkTextureRefs', 'checkPath', 'writePng', 'checkDrawWork', 'checkGeoJson', 'confirmReason',
   'endpoints', 'vec', 'num', 'LIMITS', 'startServer', 'stopServer', 'state',
 ];
@@ -113,9 +114,9 @@ it('caps keyframes per call', () => {
 it('caps bones and counts mesh polygons as cubes when opening a model', () => {
   const { fn } = plugin({ max_cubes: 10 });
   const bones = Array.from({ length: 4097 }, (_, i) => ({ name: `b${i}` }));
-  expect(() => fn.checkGeoJson({ 'minecraft:geometry': [{ bones }] }, 'x')).toThrow('4097 bones');
+  expect(() => fn.checkGeoJson({ 'minecraft:geometry': [{ description: { identifier: 'geometry.big' }, bones }] }, 'x')).toThrow('4097 bones');
   const mesh = { name: 'm', poly_mesh: { polys: Array(20).fill([[0, 0, 0]]) } };
-  expect(() => fn.checkGeoJson({ 'minecraft:geometry': [{ bones: [mesh] }] }, 'x')).toThrow('20 cubes');
+  expect(() => fn.checkGeoJson({ 'minecraft:geometry': [{ description: { identifier: 'geometry.mesh' }, bones: [mesh] }] }, 'x')).toThrow('20 cubes');
 });
 
 // ---- M4, L1, L2: the HTTP layer ----
@@ -254,4 +255,56 @@ it('refuses the file, never skips the link check, when the fs cannot list folder
   const output = tempDir('output');
   const { fn } = loadPlugin(NAMES, { home, settings: { output_folder: output }, fsWithout: ['readdirSync'] });
   expect(() => fn.checkPath('output:a.png', ['.png'])).toThrow('links cannot be checked');
+});
+
+// ---- open_model: no texture lookup outside the folders, plain identifiers only ----
+
+it('refuses geometry identifiers that are not plain names', () => {
+  const { fn } = plugin();
+  const geo = (identifier: unknown) => ({ 'minecraft:geometry': [{ description: { identifier }, bones: [] }] });
+  for (const bad of ['geometry.x/../../../../secret', 'geometry.a/b', 'geometry.a\\b', 'x.cube', '', undefined, 5]) {
+    expect(() => fn.checkGeoJson(geo(bad), 'm.geo.json'), String(bad)).toThrow('description.identifier');
+  }
+  expect(() => fn.checkGeoJson(geo('geometry.cube_mob'), 'm.geo.json')).not.toThrow();
+  expect(() => fn.checkGeoJson(JSON.parse(readFileSync(new URL('../../fixtures/cube_mob.geo.json', import.meta.url), 'utf8')), 'f')).not.toThrow();
+});
+
+it('switches off Blockbench\'s own entity and block texture lookup while a model loads, then puts it back', () => {
+  const state: string[] = [];
+  class BedrockEntityManager { initEntity() { state.push('entity lookup ran'); } }
+  class BedrockBlockManager { initBlock() { state.push('block lookup ran'); } }
+  const originals = [BedrockEntityManager.prototype.initEntity, BedrockBlockManager.prototype.initBlock];
+  const Codecs = { bedrock: { load: () => {
+    new BedrockEntityManager().initEntity();
+    new BedrockBlockManager().initBlock();
+    state.push('loaded');
+    throw new Error('stop here');
+  } } };
+  const { fn } = plugin(undefined, { BedrockEntityManager, BedrockBlockManager, Codecs });
+  expect(() => fn.loadGeo({}, 'm.geo.json')).toThrow('stop here');
+  expect(state).toEqual(['loaded']);
+  expect([BedrockEntityManager.prototype.initEntity, BedrockBlockManager.prototype.initBlock]).toEqual(originals);
+  expect(fn.withoutTextureLookup(() => 7)).toBe(7);
+  new BedrockEntityManager().initEntity();
+  expect(state).toEqual(['loaded', 'entity lookup ran']);
+});
+
+// ---- Windows paths ----
+
+it('finds the PNG next to a Java model when Blockbench asks with a backslash path', () => {
+  const { fn, output } = plugin();
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 16, 0, 0, 0, 16]);
+  writeFileSync(join(output, 'sword.png'), png);
+  const load = fn.javaTextureLoader({ full: join(output, 'sword.json') }, null);
+  expect(Buffer.compare(load('X:\\pack\\assets\\textures\\item\\sword.png'), png)).toBe(0);
+});
+
+it('refuses Windows device names in a path', () => {
+  const { fn } = plugin();
+  for (const bad of ['output:con.png', 'output:sub/LPT1.json', 'output:aux/x.png', 'output:NUL.png', 'output:Com3.json']) {
+    expect(() => fn.checkPath(bad, ['.png', '.json']), bad).toThrow('device name');
+  }
+  for (const good of ['output:icon.png', 'output:console.png', 'output:com.png', 'output:auxiliary/x.png']) {
+    expect(() => fn.checkPath(good, ['.png']), good).not.toThrow();
+  }
 });

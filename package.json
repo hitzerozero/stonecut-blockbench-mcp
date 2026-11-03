@@ -18,7 +18,6 @@
   },
   "files": [
     "dist",
-    "fixtures",
     "skills",
     "config.example.json",
     "LICENSE",

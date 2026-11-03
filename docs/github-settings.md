@@ -49,6 +49,14 @@ gh repo edit hitzerozero/stonecut-blockbench-mcp \
   --add-topic minecraft-java
 ```
 
+## Private vulnerability reporting
+
+SECURITY.md asks people to use the Security tab's "Report a vulnerability" button. Turn it on:
+
+```text
+gh api -X PUT repos/hitzerozero/stonecut-blockbench-mcp/private-vulnerability-reporting
+```
+
 ## Social preview
 
 `docs/social-preview.png` (1280 x 640) has to be uploaded by hand: on GitHub, Settings > General >

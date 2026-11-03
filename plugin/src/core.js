@@ -26,5 +26,5 @@ function findAnim(n) { return Animator.animations.find((a) => a.name === n) || b
 function animClass() { return typeof BBAnimation !== 'undefined' ? BBAnimation : Animation; }
 function sleep(ms) { return new Promise((res) => setTimeout(res, ms)); }
 function modeId() { return Mode.selected ? Mode.selected.id : 'edit'; }
-function lastSegment(p) { return String(p || '').split(/[\/]/).pop(); }
+function lastSegment(p) { return String(p || '').split(/[\\\/]/).pop(); }
 function safeFileName(s) { return s.replace(/[^A-Za-z0-9_.\-]/g, '_'); }

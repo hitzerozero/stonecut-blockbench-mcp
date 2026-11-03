@@ -29,7 +29,7 @@ function findAnim(n) { return Animator.animations.find((a) => a.name === n) || b
 function animClass() { return typeof BBAnimation !== 'undefined' ? BBAnimation : Animation; }
 function sleep(ms) { return new Promise((res) => setTimeout(res, ms)); }
 function modeId() { return Mode.selected ? Mode.selected.id : 'edit'; }
-function lastSegment(p) { return String(p || '').split(/[\/]/).pop(); }
+function lastSegment(p) { return String(p || '').split(/[\\\/]/).pop(); }
 function safeFileName(s) { return s.replace(/[^A-Za-z0-9_.\-]/g, '_'); }
 
 // Limits on the work one request can ask for.
@@ -163,6 +163,7 @@ function checkCubeTotal(total) {
 function settingsSummary() { return { file: configFile(), values: conf() }; }
 
 const PREFIX = /^(output|assets):(.*)$/;
+const WINDOWS_DEVICE = /^(con|prn|aux|nul|com\d|lpt\d)(\..*)?$/i;
 
 function defaultOutput() { return PathM.join(SystemInfo.home_directory, OUTPUT_FOLDER_NAME); }
 function absoluteSetting(key) {
@@ -221,6 +222,7 @@ function checkPath(p, exts) {
   if (full.slice(PathM.parse(full).root.length).includes(':')) bad('Path may not contain ":" after the drive');
   const root = Object.values(r).find((dir) => inside(dir, full));
   if (!root) bad(`Path not allowed: ${full}. Allowed folders: ${Object.values(r).join(', ')}`);
+  if (PathM.relative(root, full).split(/[\\/]/).some((seg) => WINDOWS_DEVICE.test(seg))) bad('Path may not use a Windows device name (CON, PRN, AUX, NUL, COM1, LPT1...): ' + full);
   const f = scopedFs(root);
   if (isBridgeFile(full, f)) bad('This file belongs to the bridge itself and cannot be read or written: ' + full);
   checkNoLinks(root, full, f);
@@ -834,9 +836,14 @@ endpoints.new_java_item = (p) => {
 };
 
 function geoSummary() { return { format: Format.id, name: Project.name, bones: Group.all.length, cubes: Cube.all.length }; }
+const GEO_IDENTIFIER = /^geometry\.[A-Za-z0-9_.\-]+$/;
 function checkGeoJson(json, full) {
   if (json && (json.elements || json.parent) && !json['minecraft:geometry']) bad('This is a Java block/item model. Use open_java_model for it: ' + full);
   if (!json || !Array.isArray(json['minecraft:geometry'])) bad('Not a .geo.json model: ' + full);
+  json['minecraft:geometry'].forEach((g, i) => {
+    const id = g && g.description && g.description.identifier;
+    if (typeof id !== 'string' || !GEO_IDENTIFIER.test(id)) bad(`minecraft:geometry[${i}].description.identifier must look like "geometry.name" (letters, digits, _ . -): ${full}`);
+  });
   const bones = geoBones(json);
   if (bones.length > LIMITS.bones) bad(`The model has ${bones.length} bones; the limit is ${LIMITS.bones}`);
   checkCubeTotal(geoCubeCount(bones));
@@ -862,9 +869,24 @@ function tagProject(tabName, full) {
   Project.name = tabName;
   Project.stonecut_path = full;
 }
+// After parsing, Blockbench looks for the entity's texture itself (textures/entity/<identifier> near the
+// working folder, the default path, entity/ and attachables/ folders) with no folder fence. Those lookups
+// are switched off while the plugin loads a model; textures come only through texture_import.
+const TEXTURE_LOOKUPS = [['BedrockEntityManager', 'initEntity'], ['BedrockBlockManager', 'initBlock']];
+function withoutTextureLookup(fn) {
+  const saved = [];
+  TEXTURE_LOOKUPS.forEach(([cls, method]) => {
+    const C = globalThis[cls];
+    if (typeof C === 'function' && C.prototype && typeof C.prototype[method] === 'function') {
+      saved.push([C.prototype, method, C.prototype[method]]);
+      C.prototype[method] = function () { return undefined; };
+    }
+  });
+  try { return fn(); } finally { saved.forEach(([proto, method, original]) => { proto[method] = original; }); }
+}
 function loadGeo(json, full) {
   try {
-    Codecs.bedrock.load(json, { path: full, no_file: true }, { switch_to_existing_tab: false });
+    withoutTextureLookup(() => Codecs.bedrock.load(json, { path: full, no_file: true }, { switch_to_existing_tab: false }));
     if (!(Project instanceof ModelProject)) bad('Blockbench closed the new tab while loading');
     tagProject(PathM.basename(full).replace(/(\.geo)?\.json$/i, ''), full);
     if (geckoInstalled() && !isGecko()) Formats.geckolib_model.convertTo();

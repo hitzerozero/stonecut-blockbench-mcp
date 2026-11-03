@@ -109,3 +109,28 @@ it('pins the package, the plugin URL, the workflow actions and the dependencies'
     expect(range, name).toMatch(/^\d+\.\d+\.\d+$/);
   }
 });
+
+// ---- Release details ----
+
+it('keeps package.json, the server and the plugin on the same version', () => {
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  const core = readFileSync(new URL('../plugin/src/core.js', import.meta.url), 'utf8');
+  const pluginVersion = /^const VERSION = '([^']+)';$/m.exec(core)?.[1];
+  expect(pkg.version).toBe(VERSION);
+  expect(pluginVersion).toBe(VERSION);
+});
+
+it('ships only files the package uses, and CI checkout keeps no credentials', () => {
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  expect(pkg.files).not.toContain('fixtures');
+  const workflow = readFileSync(new URL('../.github/workflows/test.yml', import.meta.url), 'utf8');
+  expect(workflow).toMatch(/uses: actions\/checkout@[0-9a-f]{40}[^\n]*\n\s+with:\n\s+persist-credentials: false/);
+});
+
+it('pins the version in SECURITY.md and turns on private vulnerability reporting at launch', () => {
+  const security = readFileSync(new URL('../SECURITY.md', import.meta.url), 'utf8');
+  expect(security).not.toMatch(new RegExp(`stonecut-blockbench-mcp(?!@${VERSION.replace(/\./g, '\\.')})\\b`));
+  expect(security).toContain(`npx -y stonecut-blockbench-mcp@${VERSION} --version`);
+  const settings = readFileSync(new URL('../docs/github-settings.md', import.meta.url), 'utf8');
+  expect(settings).toContain('gh api -X PUT repos/hitzerozero/stonecut-blockbench-mcp/private-vulnerability-reporting');
+});

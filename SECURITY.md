@@ -7,7 +7,8 @@ Please report security problems privately, not in a public issue.
 1. Open the repository on GitHub.
 2. Go to the Security tab and click "Report a vulnerability".
 3. Describe what you found, how to reproduce it, and which version you used
-   (`npx stonecut-blockbench-mcp --version`, and the plugin version shown in Blockbench under File > Plugins).
+   (`npx -y stonecut-blockbench-mcp@1.0.0 --version`, or the version in your MCP config, and the plugin
+   version shown in Blockbench under File > Plugins).
 
 You will get an answer in the advisory thread. Once a fix is released, the advisory is published and
 the fix is listed in [CHANGELOG.md](CHANGELOG.md).
