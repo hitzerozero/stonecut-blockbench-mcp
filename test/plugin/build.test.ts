@@ -40,6 +40,11 @@ it('registers under the id Blockbench takes from the file name', () => {
   expect(SERVER_PLUGIN_FILE_NAME).toBe(PLUGIN_FILE_NAME);
   expect(pluginPath().endsWith(PLUGIN_FILE_NAME)).toBe(true);
   expect(found.options).toMatchObject({ title: 'Stonecut Bridge', author: 'Stonecut Studio', version: VERSION, variant: 'desktop' });
+  expect(found.options).toMatchObject({
+    website: 'https://stonecut.studio/resources',
+    repository: 'https://github.com/hitzerozero/stonecut-blockbench-mcp',
+    bug_tracker: 'https://github.com/hitzerozero/stonecut-blockbench-mcp/issues',
+  });
 });
 
 it('adds generic settings and a start / stop action when loaded', () => {

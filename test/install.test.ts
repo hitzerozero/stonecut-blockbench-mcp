@@ -5,7 +5,8 @@ import {
   REMOVE_ARGS, contextFor, packageRoot, planInstall, runInstall, skillTarget,
   type InstallContext, type Io, type RunResult, type Runner,
 } from '../src/install.js';
-import { VERSION } from '../src/version.js';
+import { HELP } from '../src/cli.js';
+import { STUDIO_LINE, VERSION } from '../src/version.js';
 import { tempDir } from './helpers/temp.js';
 
 const OK: RunResult = { status: 0, stdout: '', stderr: '' };
@@ -197,4 +198,108 @@ it('with --yes goes ahead without asking', async () => {
   expect(await runInstall('install', ctx, t.io, { yes: true })).toBe(0);
   expect(t.asked()).toBe(0);
   expect(claude.isAdded()).toBe(true);
+});
+
+// ---- Complete cleanup: the token file and the settings file, never the person's models ----
+
+const TOKEN = 'ab'.repeat(32);
+
+function withData(options: Parameters<typeof fakeClaude>[0] = {}, env: Record<string, string> = {}) {
+  const claude = fakeClaude(options);
+  const home = tempDir('home');
+  const claudeDir = join(home, '.claude');
+  const ctx = contextFor({ CLAUDE_CONFIG_DIR: claudeDir, ...env }, 'linux', home, packageRoot(), claude.run);
+  const models = join(home, 'stonecut-blockbench');
+  mkdirSync(models, { recursive: true });
+  writeFileSync(join(models, 'wolf.geo.json'), '{}');
+  return { claude, ctx, home, models };
+}
+
+it('uninstall deletes the token and settings files after a yes, and keeps the output folder', async () => {
+  const { ctx, home, models } = withData();
+  writeFileSync(join(home, '.stonecut_blockbench_token'), `${TOKEN}\n`);
+  writeFileSync(join(home, '.stonecut_blockbench_config.json'), '{"allow_export": false}');
+  const t = io('y');
+  expect(await runInstall('uninstall', ctx, t.io)).toBe(0);
+  expect(t.text()).toContain(`Delete the security settings file:\n     ${join(home, '.stonecut_blockbench_config.json')}`);
+  expect(t.text()).toContain(`Delete the bridge token file:\n     ${join(home, '.stonecut_blockbench_token')}`);
+  expect(t.text()).toContain(`Kept on purpose: your output folder ${models}`);
+  expect(existsSync(join(home, '.stonecut_blockbench_token'))).toBe(false);
+  expect(existsSync(join(home, '.stonecut_blockbench_config.json'))).toBe(false);
+  expect(readFileSync(join(models, 'wolf.geo.json'), 'utf8')).toBe('{}');
+});
+
+it('names the output folder from the settings file in the kept note', async () => {
+  const { ctx, home } = withData();
+  const chosen = tempDir('chosen-output');
+  writeFileSync(join(home, '.stonecut_blockbench_config.json'), JSON.stringify({ output_folder: chosen }));
+  const t = io('n');
+  await runInstall('uninstall', ctx, t.io);
+  expect(t.text()).toContain(`Kept on purpose: your output folder ${chosen}`);
+});
+
+it('still works when the token and settings files are missing', async () => {
+  const { ctx, home } = withData();
+  const t = io('y');
+  expect(await runInstall('uninstall', ctx, t.io)).toBe(0);
+  expect(t.asked()).toBe(0);
+  expect(t.text()).toContain(`No settings file at ${join(home, '.stonecut_blockbench_config.json')}.`);
+  expect(t.text()).toContain(`No token file at ${join(home, '.stonecut_blockbench_token')}.`);
+  expect(t.text()).toMatch(/Nothing to remove/);
+});
+
+it('keeps the files on no, shows them on --dry-run, and deletes them on --yes without asking', async () => {
+  const { ctx, home } = withData();
+  const token = join(home, '.stonecut_blockbench_token');
+  const settingsFile = join(home, '.stonecut_blockbench_config.json');
+  writeFileSync(token, TOKEN);
+  writeFileSync(settingsFile, '{}');
+  expect(await runInstall('uninstall', ctx, io('n').io)).toBe(1);
+  const dry = io('y');
+  expect(await runInstall('uninstall', ctx, dry.io, { dryRun: true })).toBe(0);
+  expect(dry.asked()).toBe(0);
+  expect(dry.text()).toMatch(/Delete the security settings file[\s\S]*Delete the bridge token file[\s\S]*Dry run: nothing changed/);
+  expect([existsSync(token), existsSync(settingsFile)]).toEqual([true, true]);
+  const yes = io('n');
+  expect(await runInstall('uninstall', ctx, yes.io, { yes: true })).toBe(0);
+  expect(yes.asked()).toBe(0);
+  expect([existsSync(token), existsSync(settingsFile)]).toEqual([false, false]);
+});
+
+it('uses STONECUT_BB_TOKEN_FILE, and keeps a file there that does not hold a token', async () => {
+  const custom = join(tempDir('custom'), 'my.token');
+  writeFileSync(custom, TOKEN);
+  const a = withData({}, { STONECUT_BB_TOKEN_FILE: custom });
+  writeFileSync(join(a.home, '.stonecut_blockbench_token'), TOKEN);
+  await runInstall('uninstall', a.ctx, io('y').io);
+  expect(existsSync(custom)).toBe(false);
+  expect(existsSync(join(a.home, '.stonecut_blockbench_token'))).toBe(true);
+
+  const notes = join(tempDir('custom'), 'notes.txt');
+  writeFileSync(notes, 'my notes');
+  const b = withData({}, { STONECUT_BB_TOKEN_FILE: notes });
+  const t = io('y');
+  await runInstall('uninstall', b.ctx, t.io);
+  expect(t.text()).toContain(`${notes} does not hold a bridge token, so it is kept.`);
+  expect(readFileSync(notes, 'utf8')).toBe('my notes');
+});
+
+it('cleans up the files even when Claude Code is not found', async () => {
+  const { ctx, home, claude } = withData({ found: false });
+  writeFileSync(join(home, '.stonecut_blockbench_token'), TOKEN);
+  const t = io('y');
+  expect(await runInstall('uninstall', ctx, t.io)).toBe(0);
+  expect(t.text()).toMatch(/Claude Code was not found, so there is no stonecut-blockbench server to remove there/);
+  expect(t.text()).not.toMatch(/set things up by hand/);
+  expect(claude.changing()).toEqual([]);
+  expect(existsSync(join(home, '.stonecut_blockbench_token'))).toBe(false);
+});
+
+it('ends install and --help with the Stonecut Studio line', async () => {
+  const { ctx } = setup();
+  const t = io('y');
+  await runInstall('install', ctx, t.io);
+  expect(t.said.at(-1)!.endsWith(STUDIO_LINE)).toBe(true);
+  expect(HELP.endsWith(STUDIO_LINE)).toBe(true);
+  expect(STUDIO_LINE).toBe('Stonecut Studio: https://stonecut.studio');
 });

@@ -108,3 +108,11 @@ it('opens the README with the words people search for', () => {
   }
   expect(read('README.md').startsWith('# Stonecut Blockbench MCP\n')).toBe(true);
 });
+
+it('tells people how to remove it completely, and that their models stay', () => {
+  const readme = read('README.md');
+  const section = readme.slice(readme.indexOf('## Remove it completely'), readme.indexOf('## Manual install details'));
+  expect(section).toContain(`npx -y stonecut-blockbench-mcp@${VERSION} uninstall`);
+  expect(section).toContain('File > Plugins > Installed > Stonecut Bridge > Uninstall');
+  expect(section).toMatch(/output folder[\s\S]*kept on purpose/);
+});

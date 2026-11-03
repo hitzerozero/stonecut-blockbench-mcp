@@ -214,6 +214,15 @@ Common messages:
 - "The person did not allow this": you clicked Deny, or nobody answered the confirm question in
   Blockbench within two minutes. See `confirm` under Security settings.
 
+## Remove it completely
+
+1. Run `npx -y stonecut-blockbench-mcp@1.0.0 uninstall`. It lists what it will remove and asks y/n:
+   the server in Claude Code, the skill, the token file and the security settings file.
+2. In Blockbench: File > Plugins > Installed > Stonecut Bridge > Uninstall.
+
+Your output folder (`stonecut-blockbench` in your home folder, or the one you chose) and your assets
+folder are kept on purpose, because they hold your models. Delete them by hand if you want.
+
 ## Manual install details
 
 ### Manual setup
@@ -237,7 +246,7 @@ The same setup without an agent:
 2. Copy the skill (see "The skill" below).
 3. Start Claude Code and type `/mcp`. It lists stonecut-blockbench as connected.
 
-`npx -y stonecut-blockbench-mcp@1.0.0 uninstall` removes the server and the skill again. Both commands show
+`npx -y stonecut-blockbench-mcp@1.0.0 uninstall` removes the server, the skill, the token file and the settings file again. Both commands show
 what they will do and ask y/n first; add `--yes` to skip the question or `--dry-run` to only see the plan. Running `install` twice gives
 the same result.
 

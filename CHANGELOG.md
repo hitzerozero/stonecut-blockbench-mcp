@@ -22,10 +22,12 @@ First public release.
 - `install`, `uninstall` and `doctor` commands. `install` shows its plan and asks first (`--dry-run`
   only shows it, `--yes` skips the question), runs `claude mcp add --scope user` with
   `stonecut-blockbench-mcp@1.0.0`, and copies the skill, backing up a changed copy first. `uninstall`
-  removes only files identical to what was installed. `doctor` only reads and says how to fix each
-  failure.
+  removes only files identical to what was installed, and after the same yes also the token file and
+  the settings file; it never touches the output or assets folders. `doctor` only reads and says how to
+  fix each failure. `--help`, `install` and `doctor` end with a Stonecut Studio line.
 - The plugin is loaded from the file attached to the v1.0.0 GitHub release; its SHA-256 is in
-  `plugin/stonecut_bridge.js.sha256` and on the release page.
+  `plugin/stonecut_bridge.js.sha256` and on the release page. Its entry in Blockbench links to the
+  website, the repository and the issue tracker.
 
 ### Security
 

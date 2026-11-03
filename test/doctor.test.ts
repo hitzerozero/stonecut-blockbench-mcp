@@ -57,7 +57,7 @@ const find = (checks: Check[], re: RegExp) => {
 it('passes all seven checks when everything is set up', async () => {
   const { checks } = await doctor();
   expect(checks.map((c) => c.ok)).toEqual([true, true, true, true, true, true, true]);
-  expect(formatChecks(checks)).toMatch(/All 7 checks passed\.$/);
+  expect(formatChecks(checks)).toMatch(/All 7 checks passed\.\nStonecut Studio: https:\/\/stonecut\.studio$/);
 });
 
 it('fails an old Node version with how to fix it', async () => {
@@ -123,7 +123,7 @@ it('only reads: calls ping and status, and writes no file', async () => {
 
 it('prints a fix under every failed line and a count', () => {
   const text = formatChecks([{ ok: true, label: 'one' }, { ok: false, label: 'two', fix: 'do this' }]);
-  expect(text).toBe('PASS  one\nFAIL  two\n      Fix: do this\n\n1 of 2 checks failed.');
+  expect(text).toBe('PASS  one\nFAIL  two\n      Fix: do this\n\n1 of 2 checks failed.\nStonecut Studio: https://stonecut.studio');
 });
 
 it('cleans, shortens and marks text that comes from the bridge', async () => {

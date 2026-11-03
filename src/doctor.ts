@@ -4,7 +4,7 @@ import { BridgeError, type Bridge } from './bridge.js';
 import type { ServerConfig } from './config.js';
 import { pingReply, statusReply } from './replies.js';
 import { readSettings, type Settings } from './settings.js';
-import { VERSION } from './version.js';
+import { STUDIO_LINE, VERSION } from './version.js';
 
 export interface Check {
   ok: boolean;
@@ -161,5 +161,5 @@ export async function runDoctor(ctx: DoctorContext): Promise<Check[]> {
 export function formatChecks(checks: Check[]): string {
   const lines = checks.map((c) => `${c.ok ? 'PASS' : 'FAIL'}  ${c.label}${c.ok || !c.fix ? '' : `\n      Fix: ${c.fix}`}`);
   const failed = checks.filter((c) => !c.ok).length;
-  return `${lines.join('\n')}\n\n${failed ? `${failed} of ${checks.length} checks failed.` : `All ${checks.length} checks passed.`}`;
+  return `${lines.join('\n')}\n\n${failed ? `${failed} of ${checks.length} checks failed.` : `All ${checks.length} checks passed.`}\n${STUDIO_LINE}`;
 }

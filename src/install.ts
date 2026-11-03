@@ -2,7 +2,9 @@ import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, statSync } from 'node:fs';
 import { dirname, join, posix, relative, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SERVER_NAME, VERSION } from './version.js';
+import { loadConfig } from './config.js';
+import { readSettingsSync } from './settings.js';
+import { SERVER_NAME, STUDIO_LINE, VERSION } from './version.js';
 
 export const PACKAGE_NAME = 'stonecut-blockbench-mcp';
 /** The package at exactly this version, so Claude Code never silently runs newer code. */
@@ -60,6 +62,11 @@ export interface InstallContext {
   /** Running from a git clone (src/ is there) rather than from the npm package. */
   fromSource: boolean;
   run: Runner;
+  home: string;
+  /** The bridge's token file: STONECUT_BB_TOKEN_FILE, or .stonecut_blockbench_token in the home folder. */
+  tokenFile: string;
+  /** The security settings file, always .stonecut_blockbench_config.json in the home folder. */
+  settingsFile: string;
 }
 
 export function packageRoot(): string {
@@ -68,7 +75,11 @@ export function packageRoot(): string {
 
 export function contextFor(env: NodeJS.ProcessEnv, platform: NodeJS.Platform, home: string, root: string, run: Runner): InstallContext {
   const claudeDir = env.CLAUDE_CONFIG_DIR?.trim() || join(home, '.claude');
-  return { platform, claudeDir, packageRoot: root, fromSource: existsSync(join(root, 'src', 'index.ts')), run };
+  const config = loadConfig(env, home);
+  return {
+    platform, claudeDir, packageRoot: root, fromSource: existsSync(join(root, 'src', 'index.ts')), run,
+    home, tokenFile: config.tokenFile, settingsFile: config.settingsFile,
+  };
 }
 
 /** The command Claude Code will start for the server. */
@@ -152,13 +163,57 @@ export function backupName(file: string, now = new Date()): string {
 /** What uninstall would do: the reverse of install. Changes nothing. */
 export function planUninstall(ctx: InstallContext): Plan {
   const plan: Plan = { actions: [], notes: [] };
-  if (serverAdded(ctx)) plan.actions.push({ kind: 'run', say: `Remove the ${SERVER_NAME} server from Claude Code`, cmd: 'claude', args: REMOVE_ARGS });
+  if (!claudeFound(ctx)) plan.notes.push(`Claude Code was not found, so there is no ${SERVER_NAME} server to remove there.`);
+  else if (serverAdded(ctx)) plan.actions.push({ kind: 'run', say: `Remove the ${SERVER_NAME} server from Claude Code`, cmd: 'claude', args: REMOVE_ARGS });
   else plan.notes.push(`Claude Code has no ${SERVER_NAME} server.`);
+  planSkillRemoval(ctx, plan);
+  planDataRemoval(ctx, plan);
+  return plan;
+}
+
+function isFile(p: string): boolean {
+  try {
+    return statSync(p).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/** The output folder the person's models are in, for the "kept" note. Only reads. */
+function outputFolderNote(ctx: InstallContext): string {
+  let chosen = '';
+  try {
+    chosen = readSettingsSync(ctx.settingsFile, ctx.home).values.output_folder;
+  } catch {
+    // A broken settings file still gets deleted; the note then falls back to the default folder.
+  }
+  const where = chosen || `${join(ctx.home, 'stonecut-blockbench')} (unless you chose another folder in Blockbench)`;
+  return `Kept on purpose: your output folder ${where} and your assets folder, if you set one. They hold your models; delete them by hand if you want.`;
+}
+
+/**
+ * The token file and the settings file: only those exact files at those exact paths. The token file is
+ * deleted only when it holds a token, so a mistyped STONECUT_BB_TOKEN_FILE can never delete another file.
+ */
+function planDataRemoval(ctx: InstallContext, plan: Plan): void {
+  plan.notes.push(outputFolderNote(ctx));
+  if (isFile(ctx.settingsFile)) plan.actions.push({ kind: 'remove', say: 'Delete the security settings file', path: ctx.settingsFile });
+  else plan.notes.push(`No settings file at ${ctx.settingsFile}.`);
+  if (!isFile(ctx.tokenFile)) {
+    plan.notes.push(`No token file at ${ctx.tokenFile}.`);
+  } else if (/^[0-9a-f]{64}$/.test(readFileSync(ctx.tokenFile, 'utf8').trim())) {
+    plan.actions.push({ kind: 'remove', say: 'Delete the bridge token file', path: ctx.tokenFile });
+  } else {
+    plan.notes.push(`${ctx.tokenFile} does not hold a bridge token, so it is kept.`);
+  }
+}
+
+function planSkillRemoval(ctx: InstallContext, plan: Plan): void {
   const src = skillSource(ctx), dest = skillTarget(ctx);
   const present = existsSync(dest) ? filesIn(src).map((from) => ({ from, to: join(dest, relative(src, from)) })).filter((p) => existsSync(p.to)) : [];
   if (!present.length) {
     plan.notes.push(`No Stonecut skill in ${dest}.`);
-    return plan;
+    return;
   }
   // Only files that are exactly what this version shipped are deleted; anything changed is kept.
   const removed = present.filter((p) => sameFile(p.from, p.to)).map((p) => p.to);
@@ -167,7 +222,6 @@ export function planUninstall(ctx: InstallContext): Plan {
   const others = filesIn(dest).filter((f) => !removed.includes(f));
   if (others.length) plan.notes.push(`${dest} also holds other files; the folder is kept.`);
   else plan.actions.push({ kind: 'rmdir', say: 'Delete the empty skill folder', path: dest });
-  return plan;
 }
 
 export function describe(action: Action): string {
@@ -231,7 +285,7 @@ export interface InstallOptions {
 
 /** Shows the plan, asks y/n, and changes things only after a yes. Returns the exit code. */
 export async function runInstall(mode: Mode, ctx: InstallContext, io: Io, options: InstallOptions = {}): Promise<number> {
-  if (!claudeFound(ctx)) {
+  if (mode === 'install' && !claudeFound(ctx)) {
     io.say(manualSteps(ctx));
     return 1;
   }
@@ -254,6 +308,6 @@ export async function runInstall(mode: Mode, ctx: InstallContext, io: Io, option
   }
   execute(plan, ctx);
   io.say(mode === 'install' ? 'Done. Claude Code has the server and the skill.' : 'Done. Removed what is listed above.');
-  if (mode === 'install') io.say(`\n${pluginSteps()}\nThen start Claude Code and type /mcp: it lists ${SERVER_NAME} as connected.`);
+  if (mode === 'install') io.say(`\n${pluginSteps()}\nThen start Claude Code and type /mcp: it lists ${SERVER_NAME} as connected.\n\n${STUDIO_LINE}`);
   return 0;
 }

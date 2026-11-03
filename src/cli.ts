@@ -2,7 +2,7 @@ import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from './config.js';
 import { DEFAULT_SETTINGS, readSettingsSync } from './settings.js';
-import { PLUGIN_FILE_NAME, VERSION } from './version.js';
+import { PLUGIN_FILE_NAME, STUDIO_LINE, VERSION } from './version.js';
 
 export const HELP = `stonecut-blockbench-mcp ${VERSION}
 
@@ -25,7 +25,9 @@ Options:
 Environment:
   STONECUT_BB_PORT         Bridge port (default 38790). Must match the plugin setting.
   STONECUT_BB_TOKEN_FILE   Token file (default .stonecut_blockbench_token in your home folder).
-  STONECUT_BB_TIMEOUT_MS   How long to wait for Blockbench per call (default 180000).`;
+  STONECUT_BB_TIMEOUT_MS   How long to wait for Blockbench per call (default 180000).
+
+${STUDIO_LINE}`;
 
 export function pluginPath(): string {
   return fileURLToPath(new URL(`./${PLUGIN_FILE_NAME}`, import.meta.url));
