@@ -1,0 +1,65 @@
+{
+  "name": "stonecut-blockbench-mcp",
+  "version": "1.0.0",
+  "description": "MCP server and Blockbench plugin that let AI agents like Claude Code build Minecraft models: GeckoLib mobs with textures and animations, and Java item models.",
+  "license": "MIT",
+  "author": "Stonecut Studio",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hitzerozero/stonecut-blockbench-mcp.git"
+  },
+  "homepage": "https://stonecut.studio/resources",
+  "bugs": {
+    "url": "https://github.com/hitzerozero/stonecut-blockbench-mcp/issues"
+  },
+  "type": "module",
+  "bin": {
+    "stonecut-blockbench-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "fixtures",
+    "skills",
+    "config.example.json",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/build-plugin.mjs",
+    "prepare": "npm run build",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.check.json",
+    "selftest": "node scripts/selftest.mjs",
+    "scan": "node scripts/scan-personal.mjs"
+  },
+  "keywords": [
+    "minecraft",
+    "blockbench",
+    "blockbench-plugin",
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "geckolib",
+    "claude",
+    "claude-code",
+    "ai-agent",
+    "minecraft-modding",
+    "minecraft-models",
+    "pixel-art",
+    "animation"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}

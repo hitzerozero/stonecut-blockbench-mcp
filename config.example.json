@@ -1,0 +1,9 @@
+{
+  "output_folder": "",
+  "assets_folder": "",
+  "allow_export": true,
+  "max_texture_size": 4096,
+  "max_file_mb": 16,
+  "max_cubes": 4096,
+  "confirm": "overwrite_and_close"
+}
