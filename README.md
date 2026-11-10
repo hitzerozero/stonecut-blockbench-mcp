@@ -1,6 +1,6 @@
 # Stonecut Blockbench MCP
 
-Website: https://stonecut.studio/resources | npm: https://www.npmjs.com/package/stonecut-blockbench-mcp
+Website: https://stonecut.studio/resources | npm: https://www.npmjs.com/package/stonecut-blockbench-mcp | YouTube: https://www.youtube.com/@StonecutStudios (videos coming soon)
 
 Stonecut Blockbench MCP is an MCP server and Blockbench plugin that lets AI agents like Claude Code
 build Minecraft models in the [Blockbench](https://www.blockbench.net/) desktop app. It makes GeckoLib
